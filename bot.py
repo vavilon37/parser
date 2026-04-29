@@ -73,7 +73,7 @@ async def send_long(target, text: str, **kwargs):
     while text:
         chunk = text[:TG_LIMIT]
         text = text[TG_LIMIT:]
-        await target(chunk, **kwargs)
+        await target(chunk, parse_mode="Markdown", **kwargs)
 
 
 # ========== КЛАВИАТУРА ==========
@@ -100,6 +100,32 @@ def save_state(state: dict):
 
 # ========== ПАРСИНГ ==========
 
+def html_to_text(elem) -> str:
+    """Конвертирует HTML элемент в текст, сохраняя ссылки в формате Markdown."""
+    result = []
+    for node in elem.children:
+        if isinstance(node, str):
+            result.append(node)
+        elif node.name == "a":
+            href = node.get("href", "")
+            text = node.get_text()
+            if href and text.strip():
+                result.append(f"[{text}]({href})")
+            else:
+                result.append(text)
+        elif node.name == "br":
+            result.append("\n")
+        elif node.name in ("b", "strong"):
+            result.append(f"**{node.get_text()}**")
+        elif node.name in ("i", "em"):
+            result.append(f"_{node.get_text()}_")
+        elif node.name == "code":
+            result.append(f"`{node.get_text()}`")
+        else:
+            result.append(html_to_text(node))
+    return "".join(result)
+
+
 async def fetch_post_text(session: aiohttp.ClientSession, post_path: str) -> str | None:
     channel, post_id_str = post_path.split("/")
     post_id = int(post_id_str)
@@ -117,7 +143,6 @@ async def fetch_post_text(session: aiohttp.ClientSession, post_path: str) -> str
             html = await resp.text()
             soup = BeautifulSoup(html, "lxml")
 
-            # Ищем пост точно по data-post (формат "Channel/12345")
             post_wrap = soup.find("div", attrs={"data-post": f"{channel}/{post_id_str}"})
 
             if not post_wrap:
@@ -126,7 +151,7 @@ async def fetch_post_text(session: aiohttp.ClientSession, post_path: str) -> str
 
             text_elem = post_wrap.find("div", class_="tgme_widget_message_text")
             if text_elem:
-                return text_elem.get_text(separator="\n").strip()
+                return html_to_text(text_elem).strip()
 
             return "[медиа без текста]"
 
