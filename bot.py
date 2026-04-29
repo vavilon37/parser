@@ -65,6 +65,17 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 
+TG_LIMIT = 4096
+
+
+async def send_long(target, text: str, **kwargs):
+    """Отправляет сообщение, разбивая на части если длиннее TG_LIMIT."""
+    while text:
+        chunk = text[:TG_LIMIT]
+        text = text[TG_LIMIT:]
+        await target(chunk, **kwargs)
+
+
 # ========== КЛАВИАТУРА ==========
 
 def main_keyboard() -> InlineKeyboardMarkup:
@@ -162,25 +173,15 @@ async def check_posts(notify: bool = True) -> tuple[int, int]:
             state[item["path"]] = item["text"]
 
             if notify and CHAT_ID:
-                def make_msg(header, text, url):
-                    footer = f"\n\n🔗 {url}"
-                    max_text = 4096 - len(header) - len(footer) - 5
-                    if len(text) > max_text:
-                        text = text[:max_text] + "..."
-                    return header + text + footer
-
                 if prev_text is None:
-                    msg = make_msg(
-                        f"📋 Пост #{item['post_id']} — первоначальное сохранение\n\n",
-                        item['text'], item['url']
-                    )
+                    msg = f"📋 Пост #{item['post_id']} — первоначальное сохранение\n\n{item['text']}\n\n🔗 {item['url']}"
                 else:
-                    msg = make_msg(
-                        f"⚠️ ЦЕНА ИЗМЕНИЛАСЬ — Пост #{item['post_id']}\n\n📝 Новый текст:\n",
-                        item['text'], item['url']
-                    )
+                    msg = f"⚠️ ЦЕНА ИЗМЕНИЛАСЬ — Пост #{item['post_id']}\n\n📝 Новый текст:\n{item['text']}\n\n🔗 {item['url']}"
                 try:
-                    await bot.send_message(CHAT_ID, msg, disable_web_page_preview=True)
+                    await send_long(
+                        lambda text: bot.send_message(CHAT_ID, text, disable_web_page_preview=True),
+                        msg
+                    )
                 except Exception as e:
                     logger.error(f"Ошибка отправки: {e}")
 
@@ -237,16 +238,8 @@ async def on_get_all(callback: types.CallbackQuery):
                 disable_web_page_preview=True
             )
         else:
-            text = item['text']
-            header = f"📌 Пост #{item['post_id']}:\n\n"
-            footer = f"\n\n🔗 {item['url']}"
-            max_text = 4096 - len(header) - len(footer) - 5
-            if len(text) > max_text:
-                text = text[:max_text] + "..."
-            await callback.message.answer(
-                header + text + footer,
-                disable_web_page_preview=True
-            )
+            full = f"📌 Пост #{item['post_id']}:\n\n{item['text']}\n\n🔗 {item['url']}"
+            await send_long(callback.message.answer, full, disable_web_page_preview=True)
 
     summary = f"✅ Готово! Получено: {len(results) - errors}/{len(results)} постов"
     if errors:
