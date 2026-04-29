@@ -128,21 +128,18 @@ async def fetch_post_text(session: aiohttp.ClientSession, post_path: str) -> str
 
 
 async def fetch_all_posts() -> list[dict]:
-    """Парсит все посты и возвращает список {path, text, url, error}"""
-    results = []
     async with aiohttp.ClientSession() as session:
-        for post_path in TRACKED_POSTS:
+        async def fetch_one(post_path):
             channel, post_id = post_path.split("/")
-            post_url = f"https://t.me/{channel}/{post_id}"
             text = await fetch_post_text(session, post_path)
-            results.append({
+            return {
                 "path": post_path,
                 "post_id": post_id,
-                "url": post_url,
+                "url": f"https://t.me/{channel}/{post_id}",
                 "text": text,
-            })
-            await asyncio.sleep(1.5)
-    return results
+            }
+
+        return await asyncio.gather(*[fetch_one(p) for p in TRACKED_POSTS])
 
 
 async def check_posts(notify: bool = True) -> tuple[int, int]:
