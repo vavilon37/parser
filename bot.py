@@ -73,7 +73,7 @@ async def send_long(target, text: str, **kwargs):
     while text:
         chunk = text[:TG_LIMIT]
         text = text[TG_LIMIT:]
-        await target(chunk, parse_mode="Markdown", **kwargs)
+        await target(chunk, **kwargs)
 
 
 # ========== КЛАВИАТУРА ==========
@@ -101,13 +101,11 @@ def save_state(state: dict):
 # ========== ПАРСИНГ ==========
 
 def extract_emoji(node) -> str:
-    """Извлекает символ эмодзи из <tg-emoji> или <i class='emoji'>."""
     b = node.find("b")
     return b.get_text() if b else node.get_text()
 
 
 def html_to_text(elem) -> str:
-    """Конвертирует HTML элемент в текст, сохраняя ссылки."""
     result = []
     for node in elem.children:
         if isinstance(node, str):
@@ -118,15 +116,6 @@ def html_to_text(elem) -> str:
             result.append(extract_emoji(node))
         elif node.name == "i" and "emoji" in (node.get("class") or []):
             result.append(extract_emoji(node))
-        elif node.name == "a":
-            href = node.get("href", "")
-            inner = html_to_text(node)
-            if href and inner.strip():
-                result.append(f"[{inner}]({href})")
-            else:
-                result.append(inner)
-        elif node.name == "code":
-            result.append(f"`{node.get_text()}`")
         else:
             result.append(html_to_text(node))
     return "".join(result)
