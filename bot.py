@@ -162,17 +162,22 @@ async def check_posts(notify: bool = True) -> tuple[int, int]:
             state[item["path"]] = item["text"]
 
             if notify and CHAT_ID:
+                def make_msg(header, text, url):
+                    footer = f"\n\n🔗 {url}"
+                    max_text = 4096 - len(header) - len(footer) - 5
+                    if len(text) > max_text:
+                        text = text[:max_text] + "..."
+                    return header + text + footer
+
                 if prev_text is None:
-                    msg = (
-                        f"📋 Пост #{item['post_id']} — первоначальное сохранение\n\n"
-                        f"{item['text']}\n\n"
-                        f"🔗 {item['url']}"
+                    msg = make_msg(
+                        f"📋 Пост #{item['post_id']} — первоначальное сохранение\n\n",
+                        item['text'], item['url']
                     )
                 else:
-                    msg = (
-                        f"⚠️ ЦЕНА ИЗМЕНИЛАСЬ — Пост #{item['post_id']}\n\n"
-                        f"📝 Новый текст:\n{item['text']}\n\n"
-                        f"🔗 {item['url']}"
+                    msg = make_msg(
+                        f"⚠️ ЦЕНА ИЗМЕНИЛАСЬ — Пост #{item['post_id']}\n\n📝 Новый текст:\n",
+                        item['text'], item['url']
                     )
                 try:
                     await bot.send_message(CHAT_ID, msg, disable_web_page_preview=True)
@@ -232,8 +237,14 @@ async def on_get_all(callback: types.CallbackQuery):
                 disable_web_page_preview=True
             )
         else:
+            text = item['text']
+            header = f"📌 Пост #{item['post_id']}:\n\n"
+            footer = f"\n\n🔗 {item['url']}"
+            max_text = 4096 - len(header) - len(footer) - 5
+            if len(text) > max_text:
+                text = text[:max_text] + "..."
             await callback.message.answer(
-                f"📌 Пост #{item['post_id']}:\n\n{item['text']}\n\n🔗 {item['url']}",
+                header + text + footer,
                 disable_web_page_preview=True
             )
 
