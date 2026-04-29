@@ -17,6 +17,8 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID", "")
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "300"))  # секунды
+FORWARD_BOT_TOKEN = os.getenv("FORWARD_BOT_TOKEN", "")
+FORWARD_CHAT_ID = os.getenv("FORWARD_CHAT_ID", "")
 
 # ===== ПОСТЫ ДЛЯ ОТСЛЕЖИВАНИЯ =====
 TRACKED_POSTS = [
@@ -53,6 +55,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 bot = Bot(token=BOT_TOKEN)
+forward_bot = Bot(token=FORWARD_BOT_TOKEN) if FORWARD_BOT_TOKEN else None
 dp = Dispatcher()
 
 HEADERS = {
@@ -260,6 +263,11 @@ async def on_get_all(callback: types.CallbackQuery):
         else:
             full = f"📌 Пост #{item['post_id']}:\n\n{item['text']}\n\n🔗 {item['url']}"
             await send_long(callback.message.answer, full, disable_web_page_preview=True)
+            if forward_bot and FORWARD_CHAT_ID:
+                await send_long(
+                    lambda text: forward_bot.send_message(FORWARD_CHAT_ID, text, disable_web_page_preview=True),
+                    full
+                )
 
     summary = f"✅ Готово! Получено: {len(results) - errors}/{len(results)} постов"
     if errors:
